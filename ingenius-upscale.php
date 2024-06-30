@@ -585,7 +585,6 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 if (strtolower(strtok($line, ':')) == 'content-type') {
                     $parts = explode(":", $line);
                     $image_mime = trim($parts[1]);
-                    var_dump($parts);
                 }
             }
 

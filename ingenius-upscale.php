@@ -39,6 +39,10 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         protected const DEFAULT_RESIZE_FILETYPE = 'jpeg';
         protected const IMAGE_MAX_SIZE = 2097152;
         protected const SUPPORTED_IMAGE_FORMATS = ['image/jpeg'];
+        protected const CLAID_FILETYPE_META_KEY = 'iu_claid_file_type';
+        protected const CLAID_SMALLER_IMAGES_META_KEY = 'iu_claid_smaller_images';
+        protected const CLAID_WIDTH_META_KEY = 'iu_claid_width';
+        protected const CLAID_BEARER_META_KEY = 'iu_claid_bearer';
         protected $error = false;
         protected $general_settings;
         protected $all_upscale_settings;
@@ -97,8 +101,18 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         {
         }
 
+        /**
+         * Actions à réaliser à la désactivation du plugin
+         *
+         * @return void
+         */
         function iu_uninstall()
         {
+            // Désinstallation des données persistantes
+            delete_option(self::CLAID_BEARER_META_KEY);
+            delete_option(self::CLAID_FILETYPE_META_KEY);
+            delete_option(self::CLAID_SMALLER_IMAGES_META_KEY);
+            delete_option(self::CLAID_WIDTH_META_KEY);
         }
 
         /**
@@ -149,7 +163,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             $settings->add_field([
                 'label' => __('Clé API Claid AI', self::TEXT_DOMAIN),
                 'description' => __('Clé qui sera utilisée lors de l’utilisation des services de Claid AI. Reportez-vous à la <a href="' . esc_url('https://docs.claid.ai/authentication') . '" target="_blank">documentation relative à l’intégration de Claid AI</a> pour découvrir comment en créer une.', self::TEXT_DOMAIN),
-                'id' => 'iu_claid_bearer',
+                'id' => self::CLAID_BEARER_META_KEY,
                 'type' => 'text',
                 'placeholder' => '1/mZ1edKKACtPAb7zGlwSzvs72PvhAbGmB8K1ZrGxpcNM',
                 'sanitizer' => array(
@@ -159,7 +173,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             ]);
             $settings->add_field([
                 'label' => __('Largeur (en pixels)', self::TEXT_DOMAIN),
-                'id' => 'iu_claid_width',
+                'id' => self::CLAID_WIDTH_META_KEY,
                 'description' => __('Par défaut: ' . self::DEFAULT_RESIZE_WIDTH . ' px', self::TEXT_DOMAIN),
                 'type' => 'text',
                 'placeholder' => '1000',
@@ -171,7 +185,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
             $settings->add_field([
                 'label' => __('Type de fichier (sortie)', self::TEXT_DOMAIN),
-                'id' => 'iu_claid_file_type',
+                'id' => self::CLAID_FILETYPE_META_KEY,
                 'type' => 'select',
                 'options' => array(
                     0 => __('Sélectionner un type de fichier', self::TEXT_DOMAIN),
@@ -188,8 +202,8 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
             $settings->add_field([
                 'label' => __('Inclure les images ayant une taille inférieure (hauteur ou largeur) à la taille de redimensionnement définie', self::TEXT_DOMAIN),
-                'id' => 'iu_claid_smaller_images',
-                'description' => __('<span class="iu-desc-warning"><i class="fa-solid fa-triangle-exclamation"></i> Non recommandé : Les images pourraient être de faible qualité.</span> <br >Actuellement: ' . get_option('iu_claid_width', self::DEFAULT_RESIZE_WIDTH) . ' px', self::TEXT_DOMAIN),
+                'id' => self::CLAID_SMALLER_IMAGES_META_KEY,
+                'description' => __('<span class="iu-desc-warning"><i class="fa-solid fa-triangle-exclamation"></i> Non recommandé : Les images pourraient être de faible qualité.</span> <br >Actuellement: ' . get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH) . ' px', self::TEXT_DOMAIN),
                 'type' => 'checkbox',
             ]);
 
@@ -210,7 +224,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
          */
         function iu_verify_claid_token()
         {
-            if (null !== get_option('iu_claid_bearer') && !empty(get_option('iu_claid_bearer'))) {
+            if (null !== get_option(self::CLAID_BEARER_META_KEY) && !empty(get_option(self::CLAID_BEARER_META_KEY))) {
                 $curl = curl_init();
 
                 curl_setopt_array($curl, array(
@@ -224,7 +238,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                     CURLOPT_CUSTOMREQUEST => 'GET',
                     CURLOPT_HTTPHEADER => array(
                         'Content-Type: application/json',
-                        'Authorization: Bearer ' . get_option('iu_claid_bearer')
+                        'Authorization: Bearer ' . get_option(self::CLAID_BEARER_META_KEY)
                     ),
                 ));
 
@@ -298,7 +312,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             $attachments = $this->iu_get_products_attachments();
             $total_attachments_count = count($attachments);
 
-            if (!get_option('iu_claid_smaller_images')) {
+            if (!get_option(self::CLAID_SMALLER_IMAGES_META_KEY)) {
                 $attachments = $this->iu_get_products_attachments_by_size_limit($attachments);
             }
 
@@ -306,7 +320,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             foreach ($attachments as $attachment) {
                 $image_attributes = wp_get_attachment_image_src($attachment['ID'], 'full');
                 $image_width = $image_attributes[1];
-                if ($image_width != get_option('iu_claid_width', self::DEFAULT_RESIZE_WIDTH)) {
+                if ($image_width != get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH)) {
                     $count_images_to_rescale++;
                 }
             }
@@ -346,9 +360,9 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'api_url' => self::CLAID_API_URL . '/' . self::CLAID_API_EDIT_ENDOINT,
                 'nonce' => wp_create_nonce('iu_upscale_nonce'),
-                'bearer' => get_option('iu_claid_bearer', ''),
-                'width' => get_option('iu_claid_width', self::DEFAULT_RESIZE_WIDTH),
-                'output_filetype' => get_option('iu_claid_file_type', self::DEFAULT_RESIZE_FILETYPE),
+                'bearer' => get_option(self::CLAID_BEARER_META_KEY, ''),
+                'width' => get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH),
+                'output_filetype' => get_option(self::CLAID_FILETYPE_META_KEY, self::DEFAULT_RESIZE_FILETYPE),
                 'error_message' => __('Une erreur est survenue lors du redimensionnement de l\'image. Veuillez vérifier votre clé API Claid AI et votre configuration.', self::TEXT_DOMAIN),
                 'loading_message' => __('En cours...', self::TEXT_DOMAIN),
             ));
@@ -432,13 +446,13 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             } else {
                 $attachments = $this->iu_get_products_attachments();
 
-                $width = get_option('iu_claid_width');
+                $width = get_option(self::CLAID_WIDTH_META_KEY);
                 $attachments = array_filter($attachments, function ($attachment) use ($width) {
                     $image_attributes = wp_get_attachment_image_src($attachment['ID'], 'full');
                     return $image_attributes[1] != $width;
                 });
 
-                if (!get_option('iu_claid_smaller_images')) {
+                if (!get_option(self::CLAID_SMALLER_IMAGES_META_KEY)) {
                     $attachments = $this->iu_get_products_attachments_by_size_limit($attachments);
                 }
                 echo json_encode($attachments);
@@ -478,10 +492,10 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             <?php if ($post_parent !== null && in_array($post_parent->post_type, $post_types)) : ?>
                 <?php if (
                     (
-                        get_option('iu_claid_smaller_images') == 0
-                        && $width > get_option('iu_claid_width', self::DEFAULT_RESIZE_WIDTH)
-                        && $height > get_option('iu_claid_width', self::DEFAULT_RESIZE_WIDTH))
-                    || get_option('iu_claid_smaller_images') == 1
+                        get_option(self::CLAID_SMALLER_IMAGES_META_KEY) == 0
+                        && $width > get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH)
+                        && $height > get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH))
+                    || get_option(self::CLAID_SMALLER_IMAGES_META_KEY) == 1
                 ) : ?>
                     <button type="button" data-type-submit='upscale-item' data-attachment-url='<?= $url ?>' data-attachment-id='<?= $id ?>' class="button">Redimensionner</button>
                 <?php endif; ?>
@@ -495,7 +509,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
          */
         protected function iu_get_products_attachments_by_size_limit($attachments): array
         {
-            $width = get_option('iu_claid_width');
+            $width = get_option(self::CLAID_WIDTH_META_KEY);
             $attachments = array_filter($attachments, function ($attachment) use ($width) {
                 $image_attributes = wp_get_attachment_image_src($attachment['ID'], 'full');
                 return $image_attributes[1] > $width && $image_attributes[2] > $width;

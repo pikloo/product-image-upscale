@@ -19,6 +19,10 @@ if (!class_exists('ProductAttachment')) {
         {
             $this->source_url = $source_url;
             $this->id = media_sideload_image($this->source_url, 0, null, 'id');
+        }
+
+        public function iu_get_attachment_id()
+        {
             return $this->id;
         }
 
@@ -29,7 +33,7 @@ if (!class_exists('ProductAttachment')) {
          * @param string $size
          * @return integer
          */
-        public static function iu_get_attachment_width($attachment_id, $size = 'full') : int
+        public static function iu_get_attachment_width($attachment_id, $size = 'full'): int | null
         {
             $attachment_attributes =  wp_get_attachment_image_src($attachment_id, $size);
             return $attachment_attributes[1];
@@ -42,7 +46,7 @@ if (!class_exists('ProductAttachment')) {
          * @param string $size
          * @return integer
          */
-        public static function iu_get_attachment_height($attachment_id, $size = 'full'): int
+        public static function iu_get_attachment_height($attachment_id, $size = 'full'): int | null
         {
             $attachment_attributes =  wp_get_attachment_image_src($attachment_id, $size);
             return $attachment_attributes[2];
@@ -54,7 +58,7 @@ if (!class_exists('ProductAttachment')) {
          * @param [type] $attachment_id
          * @return string
          */
-        public static function iu_get_attachment_url($attachment_id) : string
+        public static function iu_get_attachment_url($attachment_id): string
         {
             return wp_get_attachment_url($attachment_id);
         }
@@ -65,7 +69,7 @@ if (!class_exists('ProductAttachment')) {
          * @param [type] $attachment_id
          * @return WP_Post|null
          */
-        public static function iu_get_attachment_post_parent($attachment_id) : WP_Post|null
+        public static function iu_get_attachment_post_parent($attachment_id): WP_Post|null
         {
             return get_post_parent($attachment_id);
         }
@@ -177,8 +181,9 @@ if (!class_exists('ProductAttachment')) {
 
             return $attachment_posts;
         }
-
-
-
     }
+
+    /**
+     * Get the value of id
+     */
 }

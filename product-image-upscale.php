@@ -311,6 +311,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         {
 
             $attachments = ProductAttachment::iu_get_all_attachments();
+            
             $total_attachments_count = count($attachments);
 
             if (!get_option(self::CLAID_SMALLER_IMAGES_META_KEY)) {
@@ -401,14 +402,15 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
                 if ($image_data['filesize'] < self::IMAGE_MAX_SIZE && in_array($image_mime, self::SUPPORTED_IMAGE_FORMATS)) {
                     // Upload de la nouvelle image et création d'un attachment
-                    $new_attachment = new ProductAttachment($url);    
-                    $new_attach_meta = ProductAttachment::iu_get_attachment_meta($new_attachment);
-                    $file = ProductAttachment::iu_get_attachment_file($new_attachment);
+                    $new_attachment = new ProductAttachment($url);
+                    $new_attachment_id = $new_attachment->iu_get_attachment_id();    
+                    $new_attach_meta = ProductAttachment::iu_get_attachment_meta($new_attachment_id);
+                    $file = ProductAttachment::iu_get_attachment_file($new_attachment_id);
                     $old_meta = ProductAttachment::iu_get_attachment_meta($attachment_id);
                     $old_original_file = ProductAttachment::iu_get_attachment_file($attachment_id);
 
                     // Mise à jour le fichier de l'attachment
-                    ProductAttachment::iu_update_attachment_file_and_meta($attachment_id, $file, $old_original_file, $new_attach_meta, $old_meta, $new_attachment);
+                    ProductAttachment::iu_update_attachment_file_and_meta($attachment_id, $file, $old_original_file, $new_attach_meta, $old_meta, $new_attachment_id);
 
                     echo json_encode(ProductAttachment::iu_get_attachment_url($attachment_id));
                 } else {

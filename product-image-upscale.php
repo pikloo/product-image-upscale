@@ -80,6 +80,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             $classes = array(
                 'Setting.php',
                 'MenuPage.php',
+                'ProductAttachment.php',
             );
             foreach ($classes as $file) {
                 if (!file_exists(plugin_dir_path(__FILE__) . "includes/" . $file)) {
@@ -309,7 +310,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         function iu_options_page_all_upscale_display()
         {
 
-            $attachments = $this->iu_get_products_attachments();
+            $attachments = ProductAttachment::iu_get_all_attachments();
             $total_attachments_count = count($attachments);
 
             if (!get_option(self::CLAID_SMALLER_IMAGES_META_KEY)) {
@@ -318,8 +319,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
             $count_images_to_rescale = 0;
             foreach ($attachments as $attachment) {
-                $image_attributes = wp_get_attachment_image_src($attachment['ID'], 'full');
-                $image_width = $image_attributes[1];
+                $image_width = ProductAttachment::iu_get_attachment_width($attachment['ID']);
                 if ($image_width != get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH)) {
                     $count_images_to_rescale++;
                 }
@@ -370,7 +370,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
 
         /**
-         * Remplacement d'une image d'un attachment
+         * Remplacement d'une image d'un attachment (AJAX)
          *
          * @return void
          */
@@ -389,8 +389,8 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 //Récupération de l'id de l'attachement à mettre à jour
                 $image_source = $_REQUEST['imageSource'];
 
-                $attachment_id = $this->pippin_get_image_id($image_source);
-                
+                $attachment_id = ProductAttachment::iu_get_attachment_id_from_url($image_source);
+
                 //Récupération de l'URL de la nouvelle image
                 $url = $_REQUEST['newImage'];
                 // $url = 'https://encrage.photo/wp-content/uploads/2024/05/Tales_from_ukraine1-.jpg'; //URL TEST
@@ -401,29 +401,16 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
                 if ($image_data['filesize'] < self::IMAGE_MAX_SIZE && in_array($image_mime, self::SUPPORTED_IMAGE_FORMATS)) {
                     // Upload de la nouvelle image et création d'un attachment
-                    $new_attach_id = media_sideload_image($url, 0, null, 'id');
-                    $new_attach_meta = wp_get_attachment_metadata($new_attach_id);
-                    $file = $new_attach_meta['file'];
-                    $old_meta = wp_get_attachment_metadata($attachment_id);
-                    $old_original_file = get_attached_file($attachment_id);
+                    $new_attachment = new ProductAttachment($url);    
+                    $new_attach_meta = ProductAttachment::iu_get_attachment_meta($new_attachment);
+                    $file = ProductAttachment::iu_get_attachment_file($new_attachment);
+                    $old_meta = ProductAttachment::iu_get_attachment_meta($attachment_id);
+                    $old_original_file = ProductAttachment::iu_get_attachment_file($attachment_id);
 
-                    // Mettre à jour le fichier de l'attachment
-                    update_post_meta($attachment_id, '_wp_attached_file', $file);
-                    // Mettre à jour les metadata de l'attachement
-                    update_post_meta($attachment_id, '_wp_attachment_metadata', $new_attach_meta);
-                    //Supprimer les anciens fichiers
-                    $upload_dir = wp_upload_dir();
-                    @unlink($old_original_file);
-                    foreach ($old_meta['sizes'] as $size) {
-                        $file_to_delete = $size['file'];
-                        $path = wp_mkdir_p($upload_dir['path']) ? $upload_dir['path'] : $upload_dir['basedir'];
-                        $file_path = $path . '/' . $file_to_delete;
-                        @unlink($file_path);
-                    }
-                    //Supprimer l'attachment créé
-                    $this->iu_delete_attachment_in_database($new_attach_id);
+                    // Mise à jour le fichier de l'attachment
+                    ProductAttachment::iu_update_attachment_file_and_meta($attachment_id, $file, $old_original_file, $new_attach_meta, $old_meta, $new_attachment);
 
-                    echo json_encode(wp_get_attachment_url($attachment_id));
+                    echo json_encode(ProductAttachment::iu_get_attachment_url($attachment_id));
                 } else {
                     echo json_encode(__('L\'image a un poids supérieur au poids maximal autorisé', self::TEXT_DOMAIN));
                 }
@@ -433,7 +420,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
 
 
         /**
-         * Récupérer toutes les images des produits
+         * Récupérer toutes les images des produits (AJAX)
          *
          * @return void
          */
@@ -444,12 +431,10 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 add_action('admin_notices', array(&$this, 'iu_error_notice'), 10, 1);
                 $this->iu_error_notice(__('Permission non accordée.', self::TEXT_DOMAIN));
             } else {
-                $attachments = $this->iu_get_products_attachments();
-
+                $attachments = ProductAttachment::iu_get_all_attachments();
                 $width = get_option(self::CLAID_WIDTH_META_KEY);
                 $attachments = array_filter($attachments, function ($attachment) use ($width) {
-                    $image_attributes = wp_get_attachment_image_src($attachment['ID'], 'full');
-                    return $image_attributes[1] != $width;
+                    return ProductAttachment::iu_get_attachment_width($attachment['ID']) != $width;
                 });
 
                 if (!get_option(self::CLAID_SMALLER_IMAGES_META_KEY)) {
@@ -483,11 +468,11 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             global $post;
             $id = $post->ID;
             $post_types = ['product', 'product_variation'];
-            $url = wp_get_attachment_url($id);
-            $post_parent = get_post_parent($id);
-            $image_attributes = wp_get_attachment_image_src($id, 'full');
-            $width = $image_attributes[1];
-            $height = $image_attributes[2];
+            $url = ProductAttachment::iu_get_attachment_url($id);
+            $post_parent = ProductAttachment::iu_get_attachment_post_parent($id);
+
+            $width = ProductAttachment::iu_get_attachment_width($id);
+            $height = ProductAttachment::iu_get_attachment_height($id);
         ?>
             <?php if ($post_parent !== null && in_array($post_parent->post_type, $post_types)) : ?>
                 <?php if (
@@ -511,56 +496,12 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         {
             $width = get_option(self::CLAID_WIDTH_META_KEY);
             $attachments = array_filter($attachments, function ($attachment) use ($width) {
-                $image_attributes = wp_get_attachment_image_src($attachment['ID'], 'full');
-                return $image_attributes[1] > $width && $image_attributes[2] > $width;
+                return ProductAttachment::iu_get_attachment_width($attachment['ID']) > $width && ProductAttachment::iu_get_attachment_height($attachment['ID']) > $width;
             });
 
             return $attachments;
         }
 
-        /**
-         * Extraction de la base de données des attachments liés aux produits
-         *
-         * @return array
-         */
-        protected function iu_get_products_attachments(): array
-        {
-            global $wpdb;
-            $attachment_posts = $wpdb->get_results(
-                "
-            SELECT
-            ID,
-            guid,
-            post_parent as parent,
-            post_status,
-            (SELECT post_status FROM {$wpdb->prefix}posts wp2 WHERE wp2.ID = wp.post_parent AND (post_type = 'product' OR post_type = 'product_variation')) as parent_status,
-            (SELECT post_date FROM {$wpdb->prefix}posts wp3 WHERE wp3.ID = wp.post_parent AND (post_type = 'product' OR post_type = 'product_variation')) as parent_date,
-            (SELECT post_title FROM {$wpdb->prefix}posts wp3 WHERE wp3.ID = wp.post_parent AND (post_type = 'product' OR post_type = 'product_variation')) as parent_title
-            FROM {$wpdb->prefix}posts wp
-            INNER JOIN {$wpdb->prefix}postmeta AS metadata ON (wp.ID=metadata.post_id AND metadata.meta_key = '_wp_attachment_metadata')
-            WHERE post_type = 'attachment'
-            AND post_status = 'inherit'
-            AND post_parent <> 0
-            HAVING parent_status = 'publish'
-            ORDER BY parent_date DESC
-            ;",
-                ARRAY_A
-            );
-
-            return $attachment_posts;
-        }
-
-        /**
-         * Suppression d'un attachment de la base de données
-         *
-         * @param [type] $attachment_id
-         * @return void
-         */
-        protected function iu_delete_attachment_in_database($attachment_id): void
-        {
-            global $wpdb;
-            $wpdb->query($wpdb->prepare("DELETE FROM $wpdb->posts WHERE ID='%s';", $attachment_id));
-        }
 
 
         /**
@@ -594,18 +535,6 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             );
         }
 
-        /**
-         * Récupération de l'ID d'une image à partir d'une URL
-         *
-         * @param [type] $image_url
-         * @return void
-         */
-        protected function pippin_get_image_id($image_url): string
-        {
-            global $wpdb;
-            $attachment = $wpdb->get_col($wpdb->prepare("SELECT ID FROM $wpdb->posts WHERE guid='%s';", $image_url));
-            return $attachment[0];
-        }
     }
 }
 

@@ -60,7 +60,7 @@ jQuery(function ($) {
                 const attachments = JSON.parse(response);
                 attachments.length > 0 && attachments.forEach(function (attachment) {
                     const imgUrl = attachment.guid;
-                    // replace_attachment(imgUrl, null, true); // Pour tester sans appel à claid, décommenter cette ligne
+                    // replace_attachment(imgUrl, null, 'all'); // Pour tester sans appel à claid, décommenter cette ligne
                     call_claid_api(imgUrl, button, 'all') // Pour tester sans appel à claid, commenter cette ligne
                 });
             }
@@ -117,7 +117,7 @@ jQuery(function ($) {
                     const data = JSON.parse(response.responseText);
                     const attachmentId = button.data('attachment-id');
                     $(`.iu-list-error[data-attachment-id="${attachmentId}"]`).remove();
-                    button.after(`<div class="iu-list-error" data-attachment-id="${attachmentId}" >Erreur<span class="iu-all-upscale-log__list__item-status" data-status="error"><i class="fa-solid fa-circle-xmark"></i></span> ${data.error_message}</div>`);
+                    button.after(`<div class="iu-list-error" data-attachment-id="${attachmentId}" ><span class="iu-all-upscale-log__list__item-status" data-status="error"><i class="fa-solid fa-circle-xmark"></i></span> Erreur ${data.error_message}</div>`);
                 }
                 button.text(buttonOriginalText)
                 button.prop('disabled', false);

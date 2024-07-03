@@ -35,10 +35,11 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         protected const TEXT_DOMAIN = 'iu-plugin';
         protected const CLAID_API_URL = 'https://api.claid.ai';
         protected const CLAID_API_EDIT_ENDOINT = 'v1-beta1/image/edit';
+        protected const IMAGE_MIN_WIDTH = 400;
         protected const DEFAULT_RESIZE_WIDTH = 2000;
         protected const DEFAULT_RESIZE_FILETYPE = 'jpeg';
         protected const IMAGE_MAX_SIZE = 2097152;
-        protected const SUPPORTED_IMAGE_FORMATS = ['image/jpeg'];
+        protected const SUPPORTED_IMAGE_FORMATS = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
         protected const CLAID_FILETYPE_META_KEY = 'iu_claid_file_type';
         protected const CLAID_SMALLER_IMAGES_META_KEY = 'iu_claid_smaller_images';
         protected const CLAID_WIDTH_META_KEY = 'iu_claid_width';
@@ -56,12 +57,9 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             register_deactivation_hook(__FILE__, array(&$this, 'iu_uninstall'));
 
             //Wordpress hooks
-            add_action('wp_enqueue_scripts', array(&$this, 'iu_wp_enqueue_scripts'));
             add_action('admin_enqueue_scripts', array(&$this, 'iu_wp_admin_enqueue_scripts'));
-
             add_filter('manage_media_columns', array(&$this, 'iu_media_list_column'));
             add_action('manage_media_custom_column', array(&$this, 'iu_media_list_column_action'), 10, 2);
-
             add_action('wp_ajax_iu_replace_attachment', array(&$this, 'iu_replace_attachment'));
             add_action('wp_ajax_iu_get_all_products_images', array(&$this, 'iu_get_all_products_images'));
         }
@@ -180,7 +178,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 'placeholder' => '1000',
                 'sanitizer' => array(
                     'type' => 'string',
-                    'sanitize_callback' => 'sanitize_text_field'
+                    'sanitize_callback' => array(&$this, 'iu_width_validation'),
                 ),
             ]);
 
@@ -206,6 +204,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 'id' => self::CLAID_SMALLER_IMAGES_META_KEY,
                 'description' => __('<span class="iu-desc-warning"><i class="fa-solid fa-triangle-exclamation"></i> Non recommandé : Les images pourraient être de faible qualité.</span> <br >Actuellement: ' . get_option(self::CLAID_WIDTH_META_KEY, self::DEFAULT_RESIZE_WIDTH) . ' px', self::TEXT_DOMAIN),
                 'type' => 'checkbox',
+                'checked' => get_option(self::CLAID_SMALLER_IMAGES_META_KEY) == 1
             ]);
 
             $settings->save();
@@ -216,6 +215,17 @@ if (!class_exists('IngeniusUpscalePlugin')) {
             $upscale_settings->add_section('iu_all_upscale_settings');
             $upscale_settings->save();
             $this->all_upscale_settings = $upscale_settings;
+        }
+
+
+        function iu_width_validation($value)
+        {
+            $value = intval(sanitize_text_field($value));
+            if ($value < self::IMAGE_MIN_WIDTH) {
+                add_settings_error(self::CLAID_WIDTH_META_KEY, self::CLAID_WIDTH_META_KEY, __('La largeur de l\'image doit être supérieure à '. self::IMAGE_MIN_WIDTH .' pixels.', self::TEXT_DOMAIN));
+                return null;
+            }
+            return $value;
         }
 
         /**
@@ -311,7 +321,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         {
 
             $attachments = ProductAttachment::iu_get_all_attachments();
-            
+
             $total_attachments_count = count($attachments);
 
             if (!get_option(self::CLAID_SMALLER_IMAGES_META_KEY)) {
@@ -403,7 +413,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 if ($image_data['filesize'] < self::IMAGE_MAX_SIZE && in_array($image_mime, self::SUPPORTED_IMAGE_FORMATS)) {
                     // Upload de la nouvelle image et création d'un attachment
                     $new_attachment = new ProductAttachment($url);
-                    $new_attachment_id = $new_attachment->iu_get_attachment_id();    
+                    $new_attachment_id = $new_attachment->iu_get_attachment_id();
                     $new_attach_meta = ProductAttachment::iu_get_attachment_meta($new_attachment_id);
                     $file = ProductAttachment::iu_get_attachment_file($new_attachment_id);
                     $old_meta = ProductAttachment::iu_get_attachment_meta($attachment_id);
@@ -450,7 +460,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         /**
          * Création d'une column dans la liste média de l'admin
          *
-         * @param [type] $cols
+         * @param array $cols
          * @return void
          */
         function iu_media_list_column($cols)
@@ -491,7 +501,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         /**
          * Récupération des attachments en fonction de la taille définie
          *
-         * @param [type] $attachments
+         * @param array $attachments
          * @return array
          */
         protected function iu_get_products_attachments_by_size_limit($attachments): array
@@ -509,7 +519,7 @@ if (!class_exists('IngeniusUpscalePlugin')) {
         /**
          * Renvoie des données poids et type mime d'une image récupérer d'une url via cURL
          *
-         * @param [type] $url
+         * @param string $url
          * @return array
          */
         protected function iu_get_remote_file_data($url): array
@@ -536,7 +546,6 @@ if (!class_exists('IngeniusUpscalePlugin')) {
                 'type' => $image_mime,
             );
         }
-
     }
 }
 

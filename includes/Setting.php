@@ -90,9 +90,9 @@ if (!class_exists('Setting')) {
         }
 
         /**
-         * Affichage des champs
+         * Affichage du champs
          *
-         * @param [type] $data
+         * @param array $data
          * @return void
          */
         public function default_field_callback($data)
@@ -105,7 +105,7 @@ if (!class_exists('Setting')) {
                     <?php endforeach; ?>
                 </select>
             <?php else : ?>
-                <input type="<?= esc_attr($data['type']); ?>" id="<?= esc_attr($data['id']); ?>" name="<?= esc_attr($data['id']); ?>" value="<?= $data['type'] == 'text' ? esc_attr(get_option($data['id'])) : "1"; ?>" <?= esc_attr($data['autocomplete']); ?> <?= esc_attr($data['input_class']); ?> <?= esc_attr($data['class']); ?> placeholder="<?= esc_attr($data['placeholder']); ?>" <?= esc_attr($data['type']) == 'checkbox' && get_option($data['id']) == 1 ? 'checked' : '' ?>>
+                <input type="<?= esc_attr($data['type']); ?>" id="<?= esc_attr($data['id']); ?>" name="<?= esc_attr($data['id']); ?>" value="<?= $data['type'] == 'text' ? esc_attr(get_option($data['id'])) : "1"; ?>" <?= esc_attr($data['autocomplete']); ?> <?= esc_attr($data['input_class']); ?> <?= esc_attr($data['class']); ?> placeholder="<?= esc_attr($data['placeholder']); ?>" <?= esc_attr($data['type']) == 'checkbox' && $data['checked'] ? 'checked' : '' ?>>
             <?php endif; ?>
             <p class="description"><?= $data['description'] ?></p>
 <?php
@@ -115,7 +115,7 @@ if (!class_exists('Setting')) {
          * Création d'un champ en complétant les informations manquantes
          * Ajout du champ à une section
          *
-         * @param [type] $data
+         * @param array $data
          * @return void
          */
         public function add_field($data)
@@ -143,7 +143,7 @@ if (!class_exists('Setting')) {
         /**
          * Création d'une section
          *
-         * @param [type] $id
+         * @param string|int $id
          * @param string $title
          * @return void
          */

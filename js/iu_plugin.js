@@ -57,7 +57,7 @@ jQuery(function ($) {
                 button.text(iu_data.loading_message)
             },
             success: function (response) {
-                const attachments = JSON.parse(response);
+                const attachments = Object.values(JSON.parse(response));
                 attachments.length > 0 && attachments.forEach(function (attachment) {
                     const imgUrl = attachment.guid;
                     // replace_attachment(imgUrl, null, 'all'); // Pour tester sans appel à claid, décommenter cette ligne
@@ -103,8 +103,6 @@ jQuery(function ($) {
                     button.prop('disabled', false);
                     button.text(buttonOriginalText)
                 }
-                
-                
             },
             error: function (response) {
                 if (mode == 'all') {
